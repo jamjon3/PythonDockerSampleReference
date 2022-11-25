@@ -8,61 +8,113 @@ import argparse
 import requests
 from version import __version__
 
-urls = {
-    "github_latest_api_url": "https://api.github.com/repos/microsoft/azure-pipelines-agent/releases/latest",
-    "agent_base_url": "https://vstsagentpackage.azureedge.net/agent"
-}
 
-github_api_headers = {'Accept': "application/vnd.github+json"}
-
-binary_file_name = "vsts-agent-linux.tar.gz"
-
-
-def download_binary(url, path):
+class LatestReleaseFromGithubAPI:
+    """
+    Gets the latest release from a specified GitHub Repository
     """
 
-    :param url: The download URL for the binary file
-    :param path: The path the downloaded file will be saved to
-    """
-    try:
-        print(f"Downloading the latest binary from {url}")
-        r = requests.get(url, allow_redirects=True)
-        match r.status_code:
-            case 200:
-                with open(path, 'wb') as file:
-                    file.write(r.content)
-                    print(f"Binary saved as {path}")
-            case _:
-                raise requests.exceptions.HTTPError(f"Response returned failed status code {r.status_code}")
-    except Exception as error:
-        raise
+    github_api_headers = {'Accept': "application/vnd.github+json"}
+    github_api_base_url = "https://api.github.com/repos"
+
+    def __init__(self, owner, repo):
+        self.owner = owner
+        self.repo = repo
+
+    def get_latest_release(self):
+        """
+        Uses the GitHub API to find the latest release and generates url and output file path for the download method
+
+        return string
+        """
+        try:
+            r = requests.get("/".join([
+                self.github_api_base_url,
+                self.owner,
+                self.repo,
+                "releases/latest"
+            ]), headers=self.github_api_headers, allow_redirects=True)
+            match r.status_code:
+                case 200:
+                    data = r.json()
+                    agent_ver = data['tag_name']
+                    print(f"Discovered the latest version from the GitHub API: {agent_ver}.")
+                    return agent_ver
+                case _:
+                    raise requests.exceptions.HTTPError(f"Response returned failed status code {r.status_code}")
+        except Exception as error:
+            raise
+
+    def __enter__(self):
+        """
+        __enter__ Just returns an instance of self
+
+        :return: Instance of LatestReleaseFromGithubAPI
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        __exit__ Just returns an instance of self
+
+        :param exc_type: Execution Type
+        :param exc_val: Execution Value
+        :param exc_tb: Execution
+        :return: Instance of LatestReleaseFromGithubAPI
+        """
+        return self
 
 
-def get_latest_from_api_and_download_to_folder(args):
-    """
-    Uses the GitHub API to find the latest release and generates a url and output file path for the download method
+class DownloadVSTSAgent:
+    agent_base_url = "https://vstsagentpackage.azureedge.net/agent"
+    binary_file_name = "vsts-agent-linux.tar.gz"
 
-    :param args: Input Argument dictionary
-    """
-    try:
-        r = requests.get(urls['github_latest_api_url'], headers=github_api_headers, allow_redirects=True)
-        match r.status_code:
-            case 200:
-                data = r.json()
-                agent_ver = data['tag_name'][1:]
-                print(f"Discovered the latest version from the GitHub API: {agent_ver}.")
-                download_binary(
-                    "/".join([
-                        urls['agent_base_url'],
-                        agent_ver,
-                        f"vsts-agent-linux-x64-{agent_ver}.tar.gz"
-                    ]),
-                    os.path.join(args.output, binary_file_name)
-                )
-            case _:
-                raise requests.exceptions.HTTPError(f"Response returned failed status code {r.status_code}")
-    except Exception as error:
-        raise
+    def __init__(self, agent_ver):
+        self.agent_ver = agent_ver
+
+    def download_agent(self, path):
+        """
+
+        :param path: The path the downloaded file will be saved to
+        """
+        try:
+            url = "/".join([
+                self.agent_base_url,
+                self.agent_ver,
+                f"vsts-agent-linux-x64-{self.agent_ver}.tar.gz"
+            ])
+            print(f"Downloading the latest binary from {url}")
+            r = requests.get(url, allow_redirects=True)
+            match r.status_code:
+                case 200:
+                    fullpath = os.path.join(path, self.binary_file_name)
+                    with open(fullpath, 'wb') as file:
+                        file.write(r.content)
+                        print(f"Binary saved as {fullpath}")
+                case _:
+                    raise requests.exceptions.HTTPError(f"Response returned failed status code {r.status_code}")
+        except Exception as error:
+            raise
+        return None
+
+    def __enter__(self):
+        """
+        __enter__ Creates the database connection and sets it to the class as 'db'
+
+        :return: Instance of DownloadVSTSAgent
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        __exit__ Sets Exits the class and closes the database connection
+
+        :param exc_type: Execution Type
+        :param exc_val: Execution Value
+        :param exc_tb: Execution
+        :return: Instance of DownloadVSTSAgent
+        """
+        return self
 
 
 def main(args=None):
@@ -75,7 +127,11 @@ def main(args=None):
         if args.output is not None:
             if os.path.isdir(args.output):
                 if args.downloadlatest:
-                    get_latest_from_api_and_download_to_folder(args)
+                    with LatestReleaseFromGithubAPI(
+                            "microsoft",
+                            "azure-pipelines-agent") as APILatest:
+                        with DownloadVSTSAgent(APILatest.get_latest_release()[1:]) as agentDownloader:
+                            agentDownloader.download_agent(args.output)
                 else:
                     raise ValueError(f"Usage: -d or --downloadlatest must be provided")
             else:
