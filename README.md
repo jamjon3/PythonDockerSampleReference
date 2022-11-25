@@ -15,6 +15,30 @@ Option 2:
 
 ## Option 1
 
-The python 
-docker build --tag sample  .
-docker run -it --privileged -v $(pwd):/tmp localhost/sample -d -o /tmp
+The python app pulls the latest release from the GitHub API with a small class
+as well as another small class for downloading te release binary.
+
+## Option 2
+
+Uses a docker container to 'build' the 'Option 1' basic app into a binary inside a container
+using:
+
+```docker build --tag sample  .```
+
+This builds a container with the PyInstaller binary setup with an entrypoint
+so it can be executed without specifying the binary:
+
+```docker run -it --privileged -v $(pwd):/tmp localhost/sample -d -o /tmp```
+
+Note: the '-d' flag means 'download latest' and '-o' is the volume mounted directory where 
+the latest binary will be download.
+
+## Sample Output
+
+```yaml
+$ docker run -it --privileged -v $(pwd):/tmp localhost/sample -d -o /tmp
+Emulate Docker CLI using podman. Create /etc/containers/nodocker to quiet msg.
+Discovered the latest version from the GitHub API: v2.213.2.
+Downloading the latest binary from https://vstsagentpackage.azureedge.net/agent/2.213.2/vsts-agent-linux-x64-2.213.2.tar.gz
+Binary saved as /tmp/vsts-agent-linux.tar.gz
+```
