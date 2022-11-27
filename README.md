@@ -23,7 +23,7 @@ as well as another small class for downloading te release binary.
 Uses a docker container to 'build' the 'Option 1' basic app into a binary inside a container
 using:
 
-```docker build --tag sample  .```
+```docker build --target final --tag sample .```
 
 This builds a container with the PyInstaller binary setup with an entrypoint
 so it can be executed without specifying the binary:
